@@ -74,8 +74,8 @@ EOF
 cat > "${NODES_ROOT}/pool/pool.conf" <<EOF
 rpcuser=${RPC_USER}
 rpcpass=${RPC_PASS}
-ecrdrpchost=127.0.0.1:19556
-ecrdrpccert=${NODES_ROOT}/master/rpc.cert
+dcrdrpchost=127.0.0.1:19556
+dcrdrpccert=${NODES_ROOT}/master/rpc.cert
 walletgrpchost=127.0.0.1:19558
 walletrpccert=${NODES_ROOT}/mwallet/rpc.cert
 debuglevel=trace
@@ -125,7 +125,7 @@ appdata=${NODES_ROOT}/vwallet
 simnet=1
 enablevoting=1
 enableticketbuyer=1
-ticketbuyer.limit=4
+ticketbuyer.limit=10
 pass=${WALLET_PASS}
 rpcconnect=127.0.0.1:19560
 grpclisten=127.0.0.1:19561
@@ -147,7 +147,7 @@ tmux rename-window -t $SESSION:0 'master'
 tmux send-keys "cd ${NODES_ROOT}/master" C-m
 
 echo "Starting simnet master node"
-tmux send-keys "ecrd --appdata=${NODES_ROOT}/master \
+tmux send-keys "dcrd --appdata=${NODES_ROOT}/master \
 --rpcuser=${RPC_USER} --rpcpass=${RPC_PASS} \
 --miningaddr=${POOL_MINING_ADDR} \
 --txindex \
@@ -233,7 +233,7 @@ tmux send-keys "cd ${NODES_ROOT}/vnode" C-m
 
 echo "Starting simnet voting node"
 
-tmux send-keys "ecrd --appdata=${NODES_ROOT}/vnode \
+tmux send-keys "dcrd --appdata=${NODES_ROOT}/vnode \
 --rpcuser=${RPC_USER} --rpcpass=${RPC_PASS} \
 --connect=127.0.0.1:18555 \
 --listen=127.0.0.1:19559 --rpclisten=127.0.0.1:19560 \

@@ -26,7 +26,7 @@ import (
 type Work struct {
 	jobID  string
 	header []byte
-	target *big.Int
+	target *big.Rat
 }
 
 // Miner represents a stratum mining client.
@@ -196,7 +196,6 @@ func (m *Miner) read() {
 // listen reads and processes incoming messages from the pool client. It must
 // be run as a goroutine.
 func (m *Miner) process(ctx context.Context) {
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -213,14 +212,14 @@ func (m *Miner) process(ctx context.Context) {
 			}
 
 			switch reqType {
-			case pool.RequestType:
+			case pool.RequestMessage:
 				req := msg.(*pool.Request)
 				switch req.Method {
 				// Process requests from the mining pool. There are none
 				// expected currently.
 				}
 
-			case pool.ResponseType:
+			case pool.ResponseMessage:
 				resp := msg.(*pool.Response)
 				method := m.fetchRequest(resp.ID)
 				if method == "" {
@@ -291,7 +290,7 @@ func (m *Miner) process(ctx context.Context) {
 					log.Errorf("Unknown request method for response: %s", method)
 				}
 
-			case pool.NotificationType:
+			case pool.NotificationMessage:
 				notif := msg.(*pool.Request)
 				switch notif.Method {
 				case pool.SetDifficulty:
@@ -304,7 +303,9 @@ func (m *Miner) process(ctx context.Context) {
 
 					log.Tracef("Difficulty is %v", difficulty)
 
-					diff := new(big.Int).SetUint64(difficulty)
+					// Switch to big.Rat.SetUint64() when go1.13 is the
+					// minimum supported for test builds.
+					diff := new(big.Rat).SetInt(new(big.Int).SetUint64(difficulty))
 					target, err := pool.DifficultyToTarget(m.config.net, diff)
 					if err != nil {
 						log.Errorf("Difficulty to target conversion error: %v", err)
@@ -312,7 +313,7 @@ func (m *Miner) process(ctx context.Context) {
 						continue
 					}
 
-					log.Tracef("Target is %v", target)
+					log.Tracef("Target is %v", target.FloatString(4))
 
 					m.workMtx.Lock()
 					m.work.target = target
@@ -383,7 +384,7 @@ func (m *Miner) run(ctx context.Context) {
 }
 
 // NewMiner creates a stratum mining client.
-func NewMiner(cfg *config, cancel context.CancelFunc) (*Miner, error) {
+func NewMiner(cfg *config, cancel context.CancelFunc) *Miner {
 	m := &Miner{
 		config:  cfg,
 		work:    new(Work),
@@ -395,5 +396,5 @@ func NewMiner(cfg *config, cancel context.CancelFunc) (*Miner, error) {
 	}
 
 	m.core = NewCPUMiner(m)
-	return m, nil
+	return m
 }

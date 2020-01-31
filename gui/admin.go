@@ -36,7 +36,7 @@ func (ui *GUI) GetAdmin(w http.ResponseWriter, r *http.Request) {
 		log.Errorf("session error: %v, new session generated", err)
 	}
 
-	if !ui.limiter.WithinLimit(session.ID, pool.APIClient) {
+	if !ui.cfg.WithinLimit(session.ID, pool.APIClient) {
 		http.Error(w, "Request limit exceeded", http.StatusBadRequest)
 		return
 	}
@@ -46,7 +46,7 @@ func (ui *GUI) GetAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pageData.Connections = ui.hub.FetchClientInfo()
+	pageData.Connections = ui.cfg.FetchClientInfo()
 	ui.renderTemplate(w, r, "admin", pageData)
 }
 
@@ -61,7 +61,7 @@ func (ui *GUI) PostAdmin(w http.ResponseWriter, r *http.Request) {
 		log.Errorf("session error: %v, new session generated", err)
 	}
 
-	if !ui.limiter.WithinLimit(session.ID, pool.APIClient) {
+	if !ui.cfg.WithinLimit(session.ID, pool.APIClient) {
 		http.Error(w, "Request limit exceeded", http.StatusBadRequest)
 		return
 	}
@@ -116,7 +116,7 @@ func (ui *GUI) PostBackup(w http.ResponseWriter, r *http.Request) {
 		log.Errorf("session error: %v, new session generated", err)
 	}
 
-	if !ui.limiter.WithinLimit(session.ID, pool.APIClient) {
+	if !ui.cfg.WithinLimit(session.ID, pool.APIClient) {
 		http.Error(w, "Request limit exceeded", http.StatusBadRequest)
 		return
 	}
@@ -126,7 +126,7 @@ func (ui *GUI) PostBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = ui.hub.BackupDB(w)
+	err = ui.cfg.BackupDB(w)
 
 	if err != nil {
 		log.Errorf("Error backing up database: %v", err)

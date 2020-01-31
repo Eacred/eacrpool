@@ -13,7 +13,6 @@ import (
 	"time"
 
 	bolt "github.com/coreos/bbolt"
-	"github.com/davecgh/go-spew/spew"
 	"github.com/Eacred/eacrd/chaincfg"
 	"github.com/Eacred/eacrd/dcrutil"
 )
@@ -41,7 +40,7 @@ var ShareWeights = map[string]*big.Rat{
 
 // calculatePoolDifficulty determines the difficulty at which the provided
 // hashrate can generate a pool share by the provided target time.
-func calculatePoolDifficulty(net *chaincfg.Params, hashRate *big.Int, targetTimeSecs *big.Int) (*big.Int, error) {
+func calculatePoolDifficulty(net *chaincfg.Params, hashRate *big.Int, targetTimeSecs *big.Int) *big.Rat {
 	hashesPerTargetTime := new(big.Int).Mul(hashRate, targetTimeSecs)
 	powLimit := net.PowLimit
 	powLimitFloat, _ := new(big.Float).SetInt(powLimit).Float64()
@@ -57,44 +56,37 @@ func calculatePoolDifficulty(net *chaincfg.Params, hashRate *big.Int, targetTime
 	//    difficulty = (hashes_per_sec * target_in_seconds) / iterations
 	difficulty := new(big.Rat).Quo(new(big.Rat).SetInt(hashesPerTargetTime),
 		new(big.Rat).SetFloat64(iterations))
-	diff := new(big.Int).Quo(difficulty.Num(), difficulty.Denom())
 
 	// Clamp the difficulty to 1 if needed.
-	if diff.Cmp(ZeroInt) == 0 {
-		diff = new(big.Int).SetInt64(1)
+	if difficulty.Cmp(ZeroRat) == 0 || difficulty.Cmp(ZeroRat) < 0 {
+		difficulty = new(big.Rat).SetInt64(1)
 	}
-
-	return diff, nil
+	return difficulty
 }
 
 // DifficultyToTarget converts the provided difficulty to a target based on the
 // active network.
-func DifficultyToTarget(net *chaincfg.Params, difficulty *big.Int) (*big.Int, error) {
-	powLimit := net.PowLimit
+func DifficultyToTarget(net *chaincfg.Params, difficulty *big.Rat) (*big.Rat, error) {
+	powLimit := new(big.Rat).SetInt(net.PowLimit)
 
 	// The corresponding target is calculated as:
 	//
 	//    target = pow_limit / difficulty
 	//
 	// The result is clamped to the pow limit if it exceeds it.
-	target := new(big.Int).Div(powLimit, difficulty)
-
+	target := new(big.Rat).Quo(powLimit, difficulty)
 	if target.Cmp(powLimit) > 0 {
 		target = powLimit
 	}
-
 	return target, nil
 }
 
 // calculatePoolTarget determines the target difficulty at which the provided
 // hashrate can generate a pool share by the provided target time.
-func calculatePoolTarget(net *chaincfg.Params, hashRate *big.Int, targetTimeSecs *big.Int) (*big.Int, *big.Int, error) {
-	difficulty, err := calculatePoolDifficulty(net, hashRate, targetTimeSecs)
-	if err != nil {
-		return nil, nil, err
-	}
-
+func calculatePoolTarget(net *chaincfg.Params, hashRate *big.Int, targetTimeSecs *big.Int) (*big.Rat, *big.Rat, error) {
+	difficulty := calculatePoolDifficulty(net, hashRate, targetTimeSecs)
 	target, err := DifficultyToTarget(net, difficulty)
+
 	return target, difficulty, err
 }
 
@@ -137,7 +129,6 @@ func (s *Share) Create(db *bolt.DB) error {
 		if err != nil {
 			return err
 		}
-
 		sBytes, err := json.Marshal(s)
 		if err != nil {
 			return err
@@ -168,7 +159,6 @@ func PPSEligibleShares(db *bolt.DB, min []byte, max []byte) ([]*Share, error) {
 		if err != nil {
 			return err
 		}
-
 		c := bkt.Cursor()
 		if min == nil {
 			for k, v := c.First(); k != nil; k, v = c.Next() {
@@ -177,11 +167,9 @@ func PPSEligibleShares(db *bolt.DB, min []byte, max []byte) ([]*Share, error) {
 				if err != nil {
 					return err
 				}
-
 				eligibleShares = append(eligibleShares, &share)
 			}
 		}
-
 		if min != nil {
 			for k, v := c.Seek(min); k != nil && bytes.Compare(k, max) <= 0; k, v = c.Next() {
 				var share Share
@@ -189,17 +177,14 @@ func PPSEligibleShares(db *bolt.DB, min []byte, max []byte) ([]*Share, error) {
 				if err != nil {
 					return err
 				}
-
 				eligibleShares = append(eligibleShares, &share)
 			}
 		}
-
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
 	return eligibleShares, err
 }
 
@@ -212,7 +197,6 @@ func PPLNSEligibleShares(db *bolt.DB, min []byte) ([]*Share, error) {
 		if err != nil {
 			return err
 		}
-
 		c := bkt.Cursor()
 		for k, v := c.Last(); k != nil && bytes.Compare(k, min) > 0; k, v = c.Prev() {
 			var share Share
@@ -220,25 +204,22 @@ func PPLNSEligibleShares(db *bolt.DB, min []byte) ([]*Share, error) {
 			if err != nil {
 				return err
 			}
-
 			eligibleShares = append(eligibleShares, &share)
 		}
-
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-
 	return eligibleShares, err
 }
 
-// sharePercentages calculates the percentages due each account according
-// to their weighted shares.
+// sharePercentages calculates the percentages due each account
+// according to their weighted shares.
 func sharePercentages(shares []*Share) (map[string]*big.Rat, error) {
 	totalShares := new(big.Rat)
 	tally := make(map[string]*big.Rat)
-	dividends := make(map[string]*big.Rat)
+	percentages := make(map[string]*big.Rat)
 
 	// Tally all share weights for each participation account.
 	for _, share := range shares {
@@ -248,21 +229,18 @@ func sharePercentages(shares []*Share) (map[string]*big.Rat, error) {
 				Add(tally[share.Account], share.Weight)
 			continue
 		}
-
 		tally[share.Account] = share.Weight
 	}
 
-	// Calculate each participating account to be claimed.
+	// Calculate each participating account percentage to be claimed.
 	for account, shareCount := range tally {
 		if tally[account].Cmp(ZeroRat) == 0 {
 			return nil, MakeError(ErrDivideByZero, "division by zero", nil)
 		}
-
-		dividend := new(big.Rat).Quo(shareCount, totalShares)
-		dividends[account] = dividend
+		accPercent := new(big.Rat).Quo(shareCount, totalShares)
+		percentages[account] = accPercent
 	}
-
-	return dividends, nil
+	return percentages, nil
 }
 
 // CalculatePayments calculates the payments due participating accounts.
@@ -282,110 +260,28 @@ func CalculatePayments(percentages map[string]*big.Rat, total dcrutil.Amount,
 
 	// Add a payout entry for pool fees.
 	payments = append(payments, NewPayment(poolFeesK, fee, height, estMaturity))
-
 	return payments, nil
 }
 
-// PruneShares removes invalidated shares from the db.
-func PruneShares(db *bolt.DB, minNano int64) error {
+// pruneShares removes invalidated shares from the db.
+func pruneShares(tx *bolt.Tx, minNano int64) error {
 	minBytes := nanoToBigEndianBytes(minNano)
-	err := db.Update(func(tx *bolt.Tx) error {
-		bkt, err := fetchShareBucket(tx)
+	bkt, err := fetchShareBucket(tx)
+	if err != nil {
+		return err
+	}
+	toDelete := [][]byte{}
+	cursor := bkt.Cursor()
+	for k, _ := cursor.First(); k != nil; k, _ = cursor.Next() {
+		if bytes.Compare(minBytes, k) > 0 {
+			toDelete = append(toDelete, k)
+		}
+	}
+	for _, entry := range toDelete {
+		err := bkt.Delete(entry)
 		if err != nil {
 			return err
 		}
-
-		toDelete := [][]byte{}
-		cursor := bkt.Cursor()
-		for k, _ := cursor.First(); k != nil; k, _ = cursor.Next() {
-			if bytes.Compare(minBytes, k) > 0 {
-				toDelete = append(toDelete, k)
-			}
-		}
-
-		for _, entry := range toDelete {
-			err := bkt.Delete(entry)
-			if err != nil {
-				return err
-			}
-		}
-
-		return nil
-	})
-
-	return err
-}
-
-// PPLNSSharePercentages computes the current mining reward percentages
-// due pool accounts based on work performed measured by the PPS payment scheme.
-func PPSSharePercentages(db *bolt.DB, poolFee float64, height uint32) (map[string]*big.Rat, error) {
-	now := time.Now()
-	nowNano := nanoToBigEndianBytes(now.UnixNano())
-
-	// Fetch the last payment created time.
-	var lastPaymentTimeNano []byte
-	err := db.View(func(tx *bolt.Tx) error {
-		pbkt := tx.Bucket(poolBkt)
-		if pbkt == nil {
-			desc := fmt.Sprintf("bucket %s not found", string(poolBkt))
-			return MakeError(ErrBucketNotFound, desc, nil)
-		}
-
-		v := pbkt.Get(lastPaymentCreatedOn)
-		lastPaymentTimeNano = make([]byte, len(v))
-		copy(lastPaymentTimeNano, v)
-
-		return nil
-	})
-	if err != nil {
-		return nil, err
 	}
-
-	// Fetch all eligible shares for payment calculations.
-	shares, err := PPSEligibleShares(db, lastPaymentTimeNano, nowNano)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(shares) == 0 {
-		return make(map[string]*big.Rat), nil
-	}
-
-	// Deduct pool fees and calculate the payment due each participating
-	// account.
-	percentages, err := sharePercentages(shares)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Tracef("Share PPS percentages are: %v", spew.Sdump(percentages))
-	return percentages, nil
-}
-
-// PPLNSSharePercentages computes the current mining reward percentages due pool
-// accounts based on work performed measured by the PPLNS payment scheme.
-func PPLNSSharePercentages(db *bolt.DB, poolFee float64, height uint32, periodSecs uint32) (map[string]*big.Rat, error) {
-	now := time.Now()
-	min := now.Add(-(time.Second * time.Duration(periodSecs)))
-	minNano := nanoToBigEndianBytes(min.UnixNano())
-
-	// Fetch all eligible shares within the specified period.
-	shares, err := PPLNSEligibleShares(db, minNano)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(shares) == 0 {
-		return make(map[string]*big.Rat), nil
-	}
-
-	// Deduct pool fees and calculate the payment due each participating
-	// account.
-	percentages, err := sharePercentages(shares)
-	if err != nil {
-		return nil, err
-	}
-
-	log.Tracef("Share PPLNS percentages are: %v", spew.Sdump(percentages))
-	return percentages, nil
+	return nil
 }

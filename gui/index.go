@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/Eacred/eacrd/dcrutil"
 	"github.com/Eacred/eacrpool/pool"
 )
 
@@ -53,7 +52,7 @@ func (ui *GUI) GetIndex(w http.ResponseWriter, r *http.Request) {
 		log.Errorf("session error: %v, new session generated", err)
 	}
 
-	if !ui.limiter.WithinLimit(session.ID, pool.APIClient) {
+	if !ui.cfg.WithinLimit(session.ID, pool.APIClient) {
 		http.Error(w, "Request limit exceeded", http.StatusBadRequest)
 		return
 	}
@@ -73,8 +72,8 @@ func (ui *GUI) GetIndex(w http.ResponseWriter, r *http.Request) {
 	data := indexData{
 		WorkQuotas:        wQuotas,
 		PaymentMethod:     ui.cfg.PaymentMethod,
-		LastWorkHeight:    ui.hub.FetchLastWorkHeight(),
-		LastPaymentHeight: ui.hub.FetchLastPaymentHeight(),
+		LastWorkHeight:    ui.cfg.FetchLastWorkHeight(),
+		LastPaymentHeight: ui.cfg.FetchLastPaymentHeight(),
 		MinedWork:         mWork,
 		PoolHashRate:      poolHash,
 		PoolDomain:        ui.cfg.Domain,
@@ -97,35 +96,21 @@ func (ui *GUI) GetIndex(w http.ResponseWriter, r *http.Request) {
 	// with the users input.
 	data.Address = address
 
-	// Ensure the provided address is valid.
-	addr, err := dcrutil.DecodeAddress(address)
-	if err != nil {
-		data.Error = fmt.Sprintf("Failed to decode address")
-		ui.renderTemplate(w, r, "index", data)
-		return
-	}
-
-	// Ensure address is on the active network.
-	if !addr.IsForNet(ui.cfg.ActiveNet) {
-		data.Error = fmt.Sprintf("Invalid %s addresss", ui.cfg.ActiveNet.Name)
-		ui.renderTemplate(w, r, "index", data)
-		return
-	}
-
-	accountID, err := pool.AccountID(address)
+	// Generate the account id of the provided address.
+	accountID, err := pool.AccountID(address, ui.cfg.ActiveNet)
 	if err != nil {
 		data.Error = fmt.Sprintf("Unable to generate account ID for address %s", address)
 		ui.renderTemplate(w, r, "index", data)
 		return
 	}
 
-	if !ui.hub.AccountExists(accountID) {
+	if !ui.cfg.AccountExists(accountID) {
 		data.Error = fmt.Sprintf("Nothing found for address %s", address)
 		ui.renderTemplate(w, r, "index", data)
 		return
 	}
 
-	work, err := ui.hub.FetchMinedWorkByAddress(accountID)
+	work, err := ui.cfg.FetchMinedWorkByAccount(accountID)
 	if err != nil {
 		log.Error(err)
 		http.Error(w, "FetchMinedWorkByAddress error: "+err.Error(),
@@ -133,7 +118,7 @@ func (ui *GUI) GetIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	payments, err := ui.hub.FetchPaymentsForAddress(accountID)
+	payments, err := ui.cfg.FetchPaymentsForAccount(accountID)
 	if err != nil {
 		log.Error(err)
 		http.Error(w, "FetchPaymentsForAddress error: "+err.Error(),
@@ -150,7 +135,7 @@ func (ui *GUI) GetIndex(w http.ResponseWriter, r *http.Request) {
 	data.AccountStats = &AccountStats{
 		MinedWork: work,
 		Payments:  payments,
-		Clients:   ui.hub.FetchAccountClientInfo(accountID),
+		Clients:   ui.cfg.FetchAccountClientInfo(accountID),
 		AccountID: accountID,
 	}
 

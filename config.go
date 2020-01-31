@@ -23,9 +23,8 @@ import (
 	"github.com/Eacred/eacrd/certgen"
 	"github.com/Eacred/eacrd/chaincfg"
 	"github.com/Eacred/eacrd/dcrutil"
-	"github.com/Eacred/slog"
-
 	"github.com/Eacred/eacrpool/pool"
+	"github.com/Eacred/slog"
 )
 
 const (
@@ -37,10 +36,9 @@ const (
 	defaultDBFilename            = "eacrpool.kv"
 	defaultTLSCertFilename       = "eacrpool.cert"
 	defaultTLSKeyFilename        = "eacrpool.key"
-	defaultRPCCertFilename       = "rpc.cert"
 	defaultRPCUser               = "dcrp"
 	defaultRPCPass               = "dcrppass"
-	defaultEcrdRPCHost           = "127.0.0.1:19669"
+	defaultDcrdRPCHost           = "127.0.0.1:19669"
 	defaultWalletGRPCHost        = "127.0.0.1:51028"
 	defaultPoolFeeAddr           = ""
 	defaultMaxGenTime            = 15
@@ -62,7 +60,7 @@ const (
 )
 
 var (
-	defaultActiveNet     = chaincfg.SimNetParams.Name
+	defaultActiveNet     = chaincfg.SimNetParams().Name
 	defaultPaymentMethod = pool.PPLNS
 	defaultMinPayment    = 0.2
 	eacrpoolHomeDir       = dcrutil.AppDataDir("eacrpool", false)
@@ -88,8 +86,8 @@ type config struct {
 	DebugLevel            string   `long:"debuglevel" ini-name:"debuglevel" description:"Logging level for all subsystems. {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
 	LogDir                string   `long:"logdir" ini-name:"logdir" description:"Directory to log output."`
 	DBFile                string   `long:"dbfile" ini-name:"dbfile" description:"Path to the database file."`
-	EcrdRPCHost           string   `long:"ecrdrpchost" ini-name:"ecrdrpchost" description:"The ip:port to establish an RPC connection for ecrd."`
-	EcrdRPCCert           string   `long:"ecrdrpccert" ini-name:"ecrdrpccert" description:"The ecrd RPC certificate."`
+	DcrdRPCHost           string   `long:"dcrdrpchost" ini-name:"dcrdrpchost" description:"The ip:port to establish an RPC connection for dcrd."`
+	DcrdRPCCert           string   `long:"dcrdrpccert" ini-name:"dcrdrpccert" description:"The dcrd RPC certificate."`
 	WalletGRPCHost        string   `long:"walletgrpchost" ini-name:"walletgrpchost" description:"The ip:port to establish a GRPC connection for the wallet."`
 	WalletRPCCert         string   `long:"walletrpccert" ini-name:"walletrpccert" description:"The wallet RPC certificate."`
 	RPCUser               string   `long:"rpcuser" ini-name:"rpcuser" description:"Username for RPC connections."`
@@ -99,7 +97,7 @@ type config struct {
 	MaxTxFeeReserve       float64  `long:"maxtxfeereserve" ini-name:"maxtxfeereserve" description:"The maximum amount reserved for transaction fees, in DCR."`
 	MaxGenTime            uint64   `long:"maxgentime" ini-name:"maxgentime" description:"The share creation target time for the pool in seconds. This currently should be below 30 seconds to increase the likelihood a work submission for clients between new work distributions by the pool."`
 	PaymentMethod         string   `long:"paymentmethod" ini-name:"paymentmethod" description:"The payment method of the pool. {pps, pplns}"`
-	LastNPeriod           uint32   `long:"lastnperiod" ini-name:"lastnperiod" description:"The period of interest when using the PPLNS payment scheme."`
+	LastNPeriod           uint32   `long:"lastnperiod" ini-name:"lastnperiod" description:"The time period of interest, in seconds, when using PPLNS payment scheme."`
 	WalletPass            string   `long:"walletpass" ini-name:"walletpass" description:"The wallet passphrase."`
 	MinPayment            float64  `long:"minpayment" ini-name:"minpayment" description:"The minimum payment to process for an account."`
 	SoloPool              bool     `long:"solopool" ini-name:"solopool" description:"Solo pool mode. This disables payment processing when enabled."`
@@ -111,14 +109,14 @@ type config struct {
 	TLSKey                string   `long:"tlskey" ini-name:"tlskey" description:"Path to the TLS key file."`
 	Designation           string   `long:"designation" ini-name:"designation" description:"The designated codename for this pool. Customises the logo in the top toolbar."`
 	MaxConnectionsPerHost uint32   `long:"maxconnperhost" init-name:"maxconnperhost" description:"The maximum number of connections allowed per host."`
-	Profile               string   `long:"profile" init-name:"Enable HTTP profiling on given [addr:]port -- NOTE port must be between 1024 and 65536"`
+	Profile               string   `long:"profile" init-name:"profile" description:"Enable HTTP profiling on given [addr:]port -- NOTE port must be between 1024 and 65536"`
 	CPUPort               uint32   `long:"cpuport" ini-name:"cpuport" description:"CPU miner connection port."`
 	D9Port                uint32   `long:"d9port" ini-name:"d9port" description:"Innosilicon D9 connection port."`
 	DR3Port               uint32   `long:"dr3port" ini-name:"dr3port" description:"Antminer DR3 connection port."`
 	DR5Port               uint32   `long:"dr5port" ini-name:"dr5port" description:"Antminer DR5 connection port."`
 	D1Port                uint32   `long:"d1port" ini-name:"d1port" description:"Whatsminer D1 connection port."`
 	poolFeeAddrs          []dcrutil.Address
-	ecrdRPCCerts          []byte
+	dcrdRPCCerts          []byte
 	net                   *chaincfg.Params
 }
 
@@ -320,7 +318,7 @@ func loadConfig() (*config, []string, error) {
 		LogDir:                defaultLogDir,
 		RPCUser:               defaultRPCUser,
 		RPCPass:               defaultRPCPass,
-		EcrdRPCHost:           defaultEcrdRPCHost,
+		DcrdRPCHost:           defaultDcrdRPCHost,
 		WalletGRPCHost:        defaultWalletGRPCHost,
 		PoolFeeAddrs:          []string{defaultPoolFeeAddr},
 		PoolFee:               defaultPoolFee,
@@ -526,18 +524,14 @@ func loadConfig() (*config, []string, error) {
 		return nil, nil, err
 	}
 
-	// Set the mining active network. Testnet proof of work
-	// parameters are modified here to mirror that of mainnet in order to
-	// generate reasonable difficulties for asics. Simnet is currently reserved
-	// for cpu miner tests only.
+	// Set the mining active network.
 	switch cfg.ActiveNet {
-	case chaincfg.TestNet3Params.Name:
-		cfg.net = &chaincfg.TestNet3Params
-		cfg.net.PowLimit = chaincfg.MainNetParams.PowLimit
-	case chaincfg.MainNetParams.Name:
-		cfg.net = &chaincfg.MainNetParams
-	case chaincfg.SimNetParams.Name:
-		cfg.net = &chaincfg.SimNetParams
+	case chaincfg.TestNet3Params().Name:
+		cfg.net = chaincfg.TestNet3Params()
+	case chaincfg.MainNetParams().Name:
+		cfg.net = chaincfg.MainNetParams()
+	case chaincfg.SimNetParams().Name:
+		cfg.net = chaincfg.SimNetParams()
 	default:
 		return nil, nil, fmt.Errorf("unknown network provided %v",
 			cfg.ActiveNet)
@@ -552,20 +546,13 @@ func loadConfig() (*config, []string, error) {
 		}
 
 		for _, pAddr := range cfg.PoolFeeAddrs {
-			addr, err := dcrutil.DecodeAddress(pAddr)
+			addr, err := dcrutil.DecodeAddress(pAddr, cfg.net)
 			if err != nil {
 				str := "%s: pool fee address '%v' failed to decode: %v"
 				err := fmt.Errorf(str, funcName, pAddr, err)
 				fmt.Fprintln(os.Stderr, err)
 				fmt.Fprintln(os.Stderr, usageMessage)
 				return nil, nil, err
-			}
-
-			// Ensure pool fee address is valid and on the active pool.
-			if !addr.IsForNet(cfg.net) {
-				return nil, nil,
-					fmt.Errorf("pool fee address (%v) not on the active network "+
-						"(%s)", addr, cfg.ActiveNet)
 			}
 
 			cfg.poolFeeAddrs = append(cfg.poolFeeAddrs, addr)
@@ -594,13 +581,13 @@ func loadConfig() (*config, []string, error) {
 		}
 	}
 
-	// Load ecrd RPC certificate.
-	if !fileExists(cfg.EcrdRPCCert) {
+	// Load dcrd RPC certificate.
+	if !fileExists(cfg.DcrdRPCCert) {
 		return nil, nil,
-			fmt.Errorf("ecrd RPC certificate (%v) not found", cfg.EcrdRPCCert)
+			fmt.Errorf("dcrd RPC certificate (%v) not found", cfg.DcrdRPCCert)
 	}
 
-	cfg.ecrdRPCCerts, err = ioutil.ReadFile(cfg.EcrdRPCCert)
+	cfg.dcrdRPCCerts, err = ioutil.ReadFile(cfg.DcrdRPCCert)
 	if err != nil {
 		return nil, nil, err
 	}

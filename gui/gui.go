@@ -7,10 +7,10 @@ package gui
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
 	"crypto/tls"
 	"fmt"
 	"html/template"
+	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -29,30 +29,72 @@ import (
 	"github.com/Eacred/eacrpool/pool"
 )
 
-// Config represents configuration details for the pool user interface.
 type Config struct {
-	Ctx              context.Context
-	SoloPool         bool
-	PaymentMethod    string
-	GUIDir           string
-	CSRFSecret       []byte
-	BackupPass       string
-	GUIPort          uint32
-	TLSCertFile      string
-	TLSKeyFile       string
-	UseLEHTTPS       bool
-	Domain           string
-	ActiveNet        *chaincfg.Params
+	// SoloPool represents the solo pool mining mode.
+	SoloPool bool
+	// PaymentMethod represents the pool payment method.
+	PaymentMethod string
+	// GUIDir represents the GUI directory.
+	GUIDir string
+	// CSRFSecret represents the frontend's CSRF secret.
+	CSRFSecret []byte
+	// BackupPass represents the database backup password.
+	BackupPass string
+	// GUIPort represents the port the frontend is served on.
+	GUIPort uint32
+	// TLSCertFile represents the TLS certificate file path.
+	TLSCertFile string
+	// TLSKeyFile represents the TLS key file path.
+	TLSKeyFile string
+	// UseLEHTTPS represents Letsencrypt HTTPS mode.
+	UseLEHTTPS bool
+	// Domain represents the domain name of the pool.
+	Domain string
+	// ActiveNet represents the active network being mined on.
+	ActiveNet *chaincfg.Params
+	// BlockExplorerURL represents the active network block explorer.
 	BlockExplorerURL string
-	Designation      string
-	PoolFee          float64
-	MinerPorts       map[string]uint32
+	// Designation represents the codename of the pool.
+	Designation string
+	// PoolFee represents the fee charged to participating accounts of the pool.
+	PoolFee float64
+	// MinerPorts represents the configured ports for supported miners.
+	MinerPorts map[string]uint32
+	// WithinLimit returns if a client is within its request limits.
+	WithinLimit func(string, int) bool
+	// FetchLastWorkHeight returns the last work height of the pool.
+	FetchLastWorkHeight func() uint32
+	// FetchLastPaymentheight returns the last payment height of the pool.
+	FetchLastPaymentHeight func() uint32
+	// AddPaymentRequest creates a payment request from the provided account
+	// if not already requested.
+	AddPaymentRequest func(addr string) error
+	// FetchMinedWork returns the last ten mined blocks by the pool.
+	FetchMinedWork func() ([]*pool.AcceptedWork, error)
+	// FetchWorkQuotas returns the reward distribution to pool accounts
+	// based on work contributed per the payment scheme used by the pool.
+	FetchWorkQuotas func() ([]*pool.Quota, error)
+	// FetchPoolHashRate returns the hash rate of the pool.
+	FetchPoolHashRate func() (*big.Rat, map[string][]*pool.ClientInfo)
+	// BackupDB streams a backup of the database over an http response.
+	BackupDB func(w http.ResponseWriter) error
+	// FetchClientInfo returns connection details about all pool clients.
+	FetchClientInfo func() map[string][]*pool.ClientInfo
+	// AccountExists checks if the provided account id references a pool account.
+	AccountExists func(accountID string) bool
+	// FetchMinedWorkByAccount returns a list of mined work by the provided address.
+	FetchMinedWorkByAccount func(id string) ([]*pool.AcceptedWork, error)
+	// FetchPaymentsForAccount returns a list or payments made to the provided address.
+	FetchPaymentsForAccount func(id string) ([]*pool.Payment, error)
+	// FetchAccountClientInfo returns all clients belonging to the provided
+	// account id.
+	FetchAccountClientInfo func(accountID string) []*pool.ClientInfo
 }
 
 // GUI represents the the mining pool user interface.
 type GUI struct {
 	cfg         *Config
-	hub         *pool.Hub
+	csrfSecret  []byte
 	limiter     *pool.RateLimiter
 	templates   *template.Template
 	cookieStore *sessions.CookieStore
@@ -66,17 +108,6 @@ type GUI struct {
 	workQuotasMtx sync.RWMutex
 	poolHash      string
 	poolHashMtx   sync.RWMutex
-}
-
-// generateSecret generates the CSRF secret.
-func (ui *GUI) generateSecret() ([]byte, error) {
-	secret := make([]byte, 32)
-	_, err := rand.Read(secret)
-	if err != nil {
-		return nil, err
-	}
-
-	return secret, nil
 }
 
 // route configures the http router of the user interface.
@@ -103,11 +134,11 @@ func (ui *GUI) route() {
 	ui.router.HandleFunc("/logout", ui.PostLogout).Methods("POST")
 
 	// Websocket endpoint allows the GUI to receive updated values
-	ui.router.HandleFunc("/ws", ui.RegisterWebSocket).Methods("GET")
+	ui.router.HandleFunc("/ws", ui.registerWebSocket).Methods("GET")
 }
 
 // renderTemplate executes the provided template.
-func (ui *GUI) renderTemplate(w http.ResponseWriter, r *http.Request, name string, data interface{}) {
+func (ui *GUI) renderTemplate(w http.ResponseWriter, _ *http.Request, name string, data interface{}) {
 	var doc bytes.Buffer
 	err := ui.templates.ExecuteTemplate(&doc, name, data)
 	if err != nil {
@@ -116,7 +147,6 @@ func (ui *GUI) renderTemplate(w http.ResponseWriter, r *http.Request, name strin
 			http.StatusInternalServerError)
 		return
 	}
-
 	_, err = doc.WriteTo(w)
 	if err != nil {
 		log.Errorf("unable to render template: %v", err)
@@ -124,32 +154,26 @@ func (ui *GUI) renderTemplate(w http.ResponseWriter, r *http.Request, name strin
 }
 
 // NewGUI creates an instance of the user interface.
-func NewGUI(cfg *Config, hub *pool.Hub, limiter *pool.RateLimiter) (*GUI, error) {
+func NewGUI(cfg *Config) (*GUI, error) {
 	ui := &GUI{
 		cfg:        cfg,
-		hub:        hub,
-		limiter:    limiter,
+		limiter:    pool.NewRateLimiter(),
 		minedWork:  make([]minedWork, 0),
 		workQuotas: make([]workQuota, 0),
 	}
 
 	switch cfg.ActiveNet.Name {
-	case chaincfg.TestNet3Params.Name:
-		ui.cfg.BlockExplorerURL = "https://testnet.ecrdata.org"
-	case chaincfg.SimNetParams.Name:
+	case chaincfg.TestNet3Params().Name:
+		ui.cfg.BlockExplorerURL = "https://testnet.dcrdata.org"
+	case chaincfg.SimNetParams().Name:
 		ui.cfg.BlockExplorerURL = "..."
 	default:
-		ui.cfg.BlockExplorerURL = "https://explorer.ecrdata.org"
-	}
-
-	var err error
-	ui.cfg.CSRFSecret, err = ui.hub.CSRFSecret(ui.generateSecret)
-	if err != nil {
-		return nil, err
+		ui.cfg.BlockExplorerURL = "https://dcrdata.eacred.org"
 	}
 
 	ui.cookieStore = sessions.NewCookieStore(cfg.CSRFSecret)
-	err = ui.loadTemplates()
+
+	err := ui.loadTemplates()
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +315,7 @@ func (ui *GUI) Run(ctx context.Context) {
 				// After three ticks (15 seconds) update cached pool data.
 				if ticks == 3 {
 					var err error
-					work, err := ui.hub.FetchMinedWork()
+					work, err := ui.cfg.FetchMinedWork()
 					if err != nil {
 						log.Error(err)
 						continue
@@ -313,7 +337,7 @@ func (ui *GUI) Run(ctx context.Context) {
 					ui.minedWork = workData
 					ui.minedWorkMtx.Unlock()
 
-					quotas, err := ui.hub.FetchWorkQuotas()
+					quotas, err := ui.cfg.FetchWorkQuotas()
 					if err != nil {
 						log.Error(err)
 						continue
@@ -333,7 +357,7 @@ func (ui *GUI) Run(ctx context.Context) {
 					ui.workQuotas = quotaData
 					ui.workQuotasMtx.Unlock()
 
-					poolHash, _ := ui.hub.FetchPoolHashRate()
+					poolHash, _ := ui.cfg.FetchPoolHashRate()
 
 					// Update pool hash cache.
 					ui.poolHashMtx.Lock()

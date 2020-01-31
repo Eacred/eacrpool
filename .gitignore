@@ -6,3 +6,4 @@ eacrpool
 logs
 *.log
 *.conf
+/pool/testdb
