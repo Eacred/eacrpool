@@ -1,4 +1,4 @@
-// Copyright (c) 2019 The Decred developers
+// Copyright (c) 2019 The Eacred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -149,7 +149,7 @@ func backup(db *bolt.DB) error {
 	// Backup the db file
 	err := db.View(func(tx *bolt.Tx) error {
 		now := time.Now().Format(time.RFC3339)
-		file := fmt.Sprintf("dcrpool_backup@%v.kv", now)
+		file := fmt.Sprintf("eacrpool_backup@%v.kv", now)
 		err := tx.CopyFile(file, 0600)
 		return err
 	})

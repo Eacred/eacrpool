@@ -1,4 +1,4 @@
-// Copyright (c) 2019 The Decred developers
+// Copyright (c) 2019 The Eacred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -18,11 +18,11 @@ import (
 	"github.com/Eacred/eacrd/dcrutil"
 	"github.com/Eacred/eacrd/rpcclient"
 
-	"github.com/decred/dcrpool/gui"
-	"github.com/decred/dcrpool/pool"
+	"github.com/Eacred/eacrpool/gui"
+	"github.com/Eacred/eacrpool/pool"
 )
 
-// miningPool represents a decred Proof-of-Work mining pool.
+// miningPool represents a eacred Proof-of-Work mining pool.
 type miningPool struct {
 	cfg     *config
 	httpc   *http.Client
@@ -38,12 +38,12 @@ func newPool(cfg *config) (*miningPool, error) {
 	p := new(miningPool)
 	p.cfg = cfg
 	p.limiter = pool.NewRateLimiter()
-	dcrdRPCCfg := &rpcclient.ConnConfig{
-		Host:         cfg.DcrdRPCHost,
+	ecrdRPCCfg := &rpcclient.ConnConfig{
+		Host:         cfg.EcrdRPCHost,
 		Endpoint:     "ws",
 		User:         cfg.RPCUser,
 		Pass:         cfg.RPCPass,
-		Certificates: cfg.dcrdRPCCerts,
+		Certificates: cfg.ecrdRPCCerts,
 	}
 
 	minPmt, err := dcrutil.NewAmount(cfg.MinPayment)
@@ -108,7 +108,7 @@ func newPool(cfg *config) (*miningPool, error) {
 		ActiveNet:             cfg.net,
 		WalletRPCCertFile:     cfg.WalletRPCCert,
 		WalletGRPCHost:        cfg.WalletGRPCHost,
-		DcrdRPCCfg:            dcrdRPCCfg,
+		EcrdRPCCfg:            ecrdRPCCfg,
 		PoolFee:               cfg.PoolFee,
 		MaxTxFeeReserve:       maxTxFeeReserve,
 		MaxGenTime:            cfg.MaxGenTime,
@@ -198,7 +198,7 @@ func main() {
 	mpLog.Infof("Version: %s", version())
 	mpLog.Infof("Runtime: Go version %s", runtime.Version())
 	mpLog.Infof("Home dir: %s", cfg.HomeDir)
-	mpLog.Infof("Started dcrpool.")
+	mpLog.Infof("Started eacrpool.")
 
 	go func() {
 		select {

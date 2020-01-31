@@ -1,4 +1,4 @@
-// Copyright (c) 2019 The Decred developers
+// Copyright (c) 2019 The Eacred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/Eacred/eacrd/dcrutil"
-	"github.com/decred/dcrpool/pool"
+	"github.com/Eacred/eacrpool/pool"
 )
 
 type indexData struct {

@@ -1,5 +1,5 @@
 // Copyright (c) 2013-2017 The btcsuite developers
-// Copyright (c) 2015-2019 The Decred developers
+// Copyright (c) 2015-2019 The Eacred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -13,8 +13,8 @@ import (
 	"github.com/Eacred/slog"
 	"github.com/jrick/logrotate/rotator"
 
-	"github.com/decred/dcrpool/gui"
-	"github.com/decred/dcrpool/pool"
+	"github.com/Eacred/eacrpool/gui"
+	"github.com/Eacred/eacrpool/pool"
 )
 
 // logWriter implements an io.Writer that outputs to both standard output and

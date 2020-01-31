@@ -1,4 +1,4 @@
-// Copyright (c) 2019 The Decred developers
+// Copyright (c) 2019 The Eacred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -76,7 +76,7 @@ var (
 // HubConfig represents configuration details for the hub.
 type HubConfig struct {
 	ActiveNet             *chaincfg.Params
-	DcrdRPCCfg            *rpcclient.ConnConfig
+	EcrdRPCCfg            *rpcclient.ConnConfig
 	PoolFee               float64
 	MaxTxFeeReserve       dcrutil.Amount
 	MaxGenTime            uint64
@@ -413,55 +413,55 @@ func NewHub(ctx context.Context, cancel context.CancelFunc, httpc *http.Client, 
 			h.discCh <- headerB
 		},
 
-		// TODO: Switch to OnWork notifications when dcrd PR #1410 is merged.
+		// TODO: Switch to OnWork notifications when ecrd PR #1410 is merged.
 		// OnWork: func(headerE string, target string) {
 		// 	h.processWork(headerE, target)
 		// },
 	}
 
-	// Establish RPC connection with dcrd.
-	rpcc, err := rpcclient.New(hcfg.DcrdRPCCfg, ntfnHandlers)
+	// Establish RPC connection with ecrd.
+	rpcc, err := rpcclient.New(hcfg.EcrdRPCCfg, ntfnHandlers)
 	if err != nil {
-		return nil, MakeError(ErrOther, "dcrd rpc error", err)
+		return nil, MakeError(ErrOther, "ecrd rpc error", err)
 	}
 
 	h.rpcc = rpcc
 
 	// Subscribe for chain notifications.
 
-	// TODO: Subscribe for OnWork notifications when dcrd PR #1410 is merged.
+	// TODO: Subscribe for OnWork notifications when ecrd PR #1410 is merged.
 	// if err := h.rpcc.NotifyWork(); err != nil {
 	// 	h.rpccMtx.Lock()
 	// 	h.rpcc.Shutdown()
 	// 	h.rpccMtx.Unlock()
-	// 	return nil, fmt.Errorf("notify work rpc error (dcrd): %v", err)
+	// 	return nil, fmt.Errorf("notify work rpc error (ecrd): %v", err)
 	// }
 
 	if err := h.rpcc.NotifyBlocks(); err != nil {
 		h.rpccMtx.Lock()
 		h.rpcc.Shutdown()
 		h.rpccMtx.Unlock()
-		return nil, MakeError(ErrOther, "dcrd notify blocks error", err)
+		return nil, MakeError(ErrOther, "ecrd notify blocks error", err)
 	}
 
-	log.Tracef("rpc connection established with dcrd.")
+	log.Tracef("rpc connection established with ecrd.")
 
 	// Establish GRPC connection with the wallet if not in solo pool mode.
 	if !h.cfg.SoloPool {
 		creds, err := credentials.NewClientTLSFromFile(hcfg.WalletRPCCertFile,
 			"localhost")
 		if err != nil {
-			return nil, MakeError(ErrOther, "dcrwallet grpc tls error", err)
+			return nil, MakeError(ErrOther, "eacrwallet grpc tls error", err)
 		}
 
 		h.gConn, err = grpc.Dial(hcfg.WalletGRPCHost,
 			grpc.WithTransportCredentials(creds))
 		if err != nil {
-			return nil, MakeError(ErrOther, "dcrwallet grpc dial error", err)
+			return nil, MakeError(ErrOther, "eacrwallet grpc dial error", err)
 		}
 
 		if h.gConn == nil {
-			desc := "failed to establish grpc with dcrwallet"
+			desc := "failed to establish grpc with eacrwallet"
 			return nil, MakeError(ErrOther, desc, nil)
 		}
 
@@ -475,10 +475,10 @@ func NewHub(ctx context.Context, cancel context.CancelFunc, httpc *http.Client, 
 		_, err = h.grpc.Balance(context.TODO(), req)
 		h.grpcMtx.Unlock()
 		if err != nil {
-			return nil, MakeError(ErrOther, "dcrwallet grpc request error", err)
+			return nil, MakeError(ErrOther, "eacrwallet grpc request error", err)
 		}
 
-		log.Infof("grpc connection established with dcrwallet.")
+		log.Infof("grpc connection established with eacrwallet.")
 	}
 
 	return h, nil

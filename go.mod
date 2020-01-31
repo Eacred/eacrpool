@@ -1,11 +1,8 @@
-module github.com/decred/dcrpool
+module github.com/Eacred/eacrpool
 
 go 1.12
 
 require (
-	github.com/Eacred/eacrd v0.0.0-20200130225131-86d11748c652
-	github.com/Eacred/eacrwallet v0.0.0-20200131062242-02ad26a6b98c
-	github.com/Eacred/slog v1.0.1
 	github.com/coreos/bbolt v1.3.3
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dchest/blake256 v1.0.0

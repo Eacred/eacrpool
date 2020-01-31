@@ -1,4 +1,4 @@
-// Copyright (c) 2019 The Decred developers
+// Copyright (c) 2019 The Eacred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -376,7 +376,7 @@ func TestCalculatePoolTarget(t *testing.T) {
 }
 
 // Currently not using cursor delete's even though this test passing. An
-// identical test in a PR for dcrwallet is failing, inconsistent
+// identical test in a PR for eacrwallet is failing, inconsistent
 // behaviour.
 func TestBoltDBCursorDeletion(t *testing.T) {
 	db, err := setupDB()

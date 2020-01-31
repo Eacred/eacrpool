@@ -22,7 +22,7 @@ var dbUpgradeTests = [...]struct {
 func TestUpgrades(t *testing.T) {
 	t.Parallel()
 
-	d, err := ioutil.TempDir("", "dcrpool_test_upgrades")
+	d, err := ioutil.TempDir("", "eacrpool_test_upgrades")
 	if err != nil {
 		t.Fatal(err)
 	}

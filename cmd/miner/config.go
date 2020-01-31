@@ -1,4 +1,4 @@
-// Copyright (c) 2019 The Decred developers
+// Copyright (c) 2019 The Eacred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -47,7 +47,7 @@ type config struct {
 	ActiveNet  string `long:"activenet" description:"The active network being mined on. {simnet, testnet, mainnet}"`
 	User       string `long:"user" description:"The username of the mining account"`
 	Address    string `long:"address" description:"The address of the mining account"`
-	Pool       string `long:"pool" description:"The stratum domain and port of the mining pool to connect to. eg. dcrpool.com:4445"`
+	Pool       string `long:"pool" description:"The stratum domain and port of the mining pool to connect to. eg. eacrpool.com:4445"`
 	DebugLevel string `long:"debuglevel" description:"Logging level for all subsystems {trace, debug, info, warn, error, critical} -- You may also specify <subsystem>=<level>,<subsystem2>=<level>,... to set the log level for individual subsystems -- Use show to list available subsystems"`
 	LogDir     string `long:"logdir" description:"The log output directory."`
 	MaxProcs   int    `long:"maxprocs" description:"Number of CPU cores to use. Default is all cores."`
@@ -218,7 +218,7 @@ func newConfigParser(cfg *config, so *serviceOptions, options flags.Options) (*f
 // 	3) Load configuration file overwriting defaults with any specified options
 // 	4) Parse CLI options and overwrite/add any specified options
 //
-// The above results in dcrpool functioning properly without any config settings
+// The above results in eacrpool functioning properly without any config settings
 // while still allowing the user to override settings with config files and
 // command line options.  Command line options always take precedence.
 func loadConfig() (*config, []string, error) {

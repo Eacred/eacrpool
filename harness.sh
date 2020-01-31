@@ -74,8 +74,8 @@ EOF
 cat > "${NODES_ROOT}/pool/pool.conf" <<EOF
 rpcuser=${RPC_USER}
 rpcpass=${RPC_PASS}
-dcrdrpchost=127.0.0.1:19556
-dcrdrpccert=${NODES_ROOT}/master/rpc.cert
+ecrdrpchost=127.0.0.1:19556
+ecrdrpccert=${NODES_ROOT}/master/rpc.cert
 walletgrpchost=127.0.0.1:19558
 walletrpccert=${NODES_ROOT}/mwallet/rpc.cert
 debuglevel=trace
@@ -147,7 +147,7 @@ tmux rename-window -t $SESSION:0 'master'
 tmux send-keys "cd ${NODES_ROOT}/master" C-m
 
 echo "Starting simnet master node"
-tmux send-keys "dcrd --appdata=${NODES_ROOT}/master \
+tmux send-keys "ecrd --appdata=${NODES_ROOT}/master \
 --rpcuser=${RPC_USER} --rpcpass=${RPC_PASS} \
 --miningaddr=${POOL_MINING_ADDR} \
 --txindex \
@@ -193,13 +193,13 @@ chmod +x "${NODES_ROOT}/mwallet/ctl"
 
 tmux new-window -t $SESSION:2 -n 'mwallet'
 tmux send-keys "cd ${NODES_ROOT}/mwallet" C-m
-tmux send-keys "dcrwallet -C mwallet.conf --create" C-m
+tmux send-keys "eacrwallet -C mwallet.conf --create" C-m
 echo "Creating simnet master wallet"
 sleep 1
 tmux send-keys "${WALLET_PASS}" C-m "${WALLET_PASS}" C-m "n" C-m "y" C-m
 sleep 1
 tmux send-keys "${MASTER_WALLET_SEED}" C-m C-m
-tmux send-keys "dcrwallet -C mwallet.conf " C-m # --debuglevel=warn
+tmux send-keys "eacrwallet -C mwallet.conf " C-m # --debuglevel=warn
 
 # ################################################################################
 # # Setup the pool wallet's dcrctl (wctl).
@@ -233,7 +233,7 @@ tmux send-keys "cd ${NODES_ROOT}/vnode" C-m
 
 echo "Starting simnet voting node"
 
-tmux send-keys "dcrd --appdata=${NODES_ROOT}/vnode \
+tmux send-keys "ecrd --appdata=${NODES_ROOT}/vnode \
 --rpcuser=${RPC_USER} --rpcpass=${RPC_PASS} \
 --connect=127.0.0.1:18555 \
 --listen=127.0.0.1:19559 --rpclisten=127.0.0.1:19560 \
@@ -289,13 +289,13 @@ chmod +x "${NODES_ROOT}/vwallet/tickets"
 
 tmux new-window -t $SESSION:6 -n 'vwallet'
 tmux send-keys "cd ${NODES_ROOT}/vwallet" C-m
-tmux send-keys "dcrwallet -C vwallet.conf --create" C-m
+tmux send-keys "eacrwallet -C vwallet.conf --create" C-m
 echo "Creating simnet voting wallet"
 sleep 1
 tmux send-keys "${WALLET_PASS}" C-m "${WALLET_PASS}" C-m "n" C-m "y" C-m
 sleep 1
 tmux send-keys "${VOTING_WALLET_SEED}" C-m C-m
-tmux send-keys "dcrwallet -C vwallet.conf --debuglevel=debug" C-m
+tmux send-keys "eacrwallet -C vwallet.conf --debuglevel=debug" C-m
 
 ################################################################################
 # Setup the voting wallet's dcrctl (vwctl).
@@ -305,13 +305,13 @@ tmux new-window -t $SESSION:7 -n 'vwctl'
 tmux send-keys "cd ${NODES_ROOT}/vwallet" C-m
 
 ################################################################################
-# Setup dcrpool.
+# Setup eacrpool.
 ################################################################################
-echo "Starting dcrpool"
+echo "Starting eacrpool"
 sleep 5
 tmux new-window -t $SESSION:8 -n 'pool'
 tmux send-keys "cd ${NODES_ROOT}/pool" C-m
-tmux send-keys "dcrpool --configfile=pool.conf --homedir=${NODES_ROOT}/pool" C-m
+tmux send-keys "eacrpool --configfile=pool.conf --homedir=${NODES_ROOT}/pool" C-m
 
 ################################################################################
 # Setup first mining client. 

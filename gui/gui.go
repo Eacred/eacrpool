@@ -1,4 +1,4 @@
-// Copyright (c) 2019 The Decred developers
+// Copyright (c) 2019 The Eacred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -26,7 +26,7 @@ import (
 	"github.com/gorilla/sessions"
 
 	"github.com/Eacred/eacrd/chaincfg"
-	"github.com/decred/dcrpool/pool"
+	"github.com/Eacred/eacrpool/pool"
 )
 
 // Config represents configuration details for the pool user interface.
@@ -135,11 +135,11 @@ func NewGUI(cfg *Config, hub *pool.Hub, limiter *pool.RateLimiter) (*GUI, error)
 
 	switch cfg.ActiveNet.Name {
 	case chaincfg.TestNet3Params.Name:
-		ui.cfg.BlockExplorerURL = "https://testnet.dcrdata.org"
+		ui.cfg.BlockExplorerURL = "https://testnet.ecrdata.org"
 	case chaincfg.SimNetParams.Name:
 		ui.cfg.BlockExplorerURL = "..."
 	default:
-		ui.cfg.BlockExplorerURL = "https://explorer.dcrdata.org"
+		ui.cfg.BlockExplorerURL = "https://explorer.ecrdata.org"
 	}
 
 	var err error

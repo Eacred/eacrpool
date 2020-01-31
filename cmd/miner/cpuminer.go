@@ -1,5 +1,5 @@
 // Copyright (c) 2014-2016 The btcsuite developers
-// Copyright (c) 2015-2019 The Decred developers
+// Copyright (c) 2015-2019 The Eacred developers
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -18,7 +18,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/Eacred/eacrd/blockchain"
 	"github.com/Eacred/eacrd/wire"
-	"github.com/decred/dcrpool/pool"
+	"github.com/Eacred/eacrpool/pool"
 )
 
 const (
