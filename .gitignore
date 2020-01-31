@@ -1,0 +1,8 @@
+vendor
+.DS_Store
+tmp
+dcrpool
+/miner/miner
+logs
+*.log
+*.conf
